@@ -3,6 +3,8 @@ import Chart from "../components/Chart"
 import Prices, { Input } from "../components/Input"
 import { TokenProvider } from "../context/TokenContext";
 
+import TopHolders from '../components/TopHolders';
+
 
 const HomePage = () => {
   return (
@@ -10,6 +12,7 @@ const HomePage = () => {
       <TokenProvider>
         <Input/>
         <Chart/>
+        <TopHolders/>
       </TokenProvider>
     </div>
   )

@@ -4,18 +4,32 @@ import { getPriceChart } from "../services/getChart";
 import { useToken } from "../context/TokenContext";
 import { useQuery } from "@tanstack/react-query";
 
+
 export const Input = () => {
-  let { tokenAddress, setTokenAddress } = useToken();
+  let { tokenAddress, setTokenAddress, setChartPrice } = useToken();
   const [inputValue, setInputValue] = useState("");
   const [error, setError] = useState("");
-  const [loading, setLoading] = useState(false);
-  const [name, setName] = useState("")
-  const [price, setPrice] = useState("")
-  const [marketCap, setMarketCap] = useState("")
-  const [logo, setLogo] = useState("")
-  const [symbol, setSymbol] = useState("")
-  const [clear, setClear] = useState(false)
+  const [polling, setPolling] = useState(false)
 
+  const {
+    data,
+    isLoading,
+    isError,
+  } = useQuery({
+    queryKey: ["tokenOverview", tokenAddress],
+    queryFn: () => getTokenOverview(tokenAddress),
+    enabled: !!tokenAddress,
+    // polling every ** minutes if polling is true
+    refetchInterval: polling ? 300000 : false,
+    // avoids extra API calls when tab refocuses
+    refetchOnWindowFocus: false,
+    // keep polling even when tab inactive ...set to false for now
+    refetchIntervalInBackground: false,
+    // → cache stays fresh for 30s
+    staleTime: 30000
+
+  });
+  
   const isValidSolanaAddress = (address: string): boolean => {
   if (!address) return false;
 
@@ -30,19 +44,36 @@ export const Input = () => {
   return true;
 };
 
-const validateToken = (data: any) => {
-  if (!data) return false;
+const validateToken = (apiData: any): boolean => {
+  if (!apiData) return false;
 
   // must have identity
-  if (!data.address || !data.symbol || !data.name) return false;
+  if (!apiData.address || !apiData.symbol || !apiData.name) return false;
 
   // must have price
-  if (!data.price || data.price <= 0) return false;
+  if (!apiData.price || apiData.price <= 0) return false;
 
-  // must have liquidity (important for meme tokens)
-  if (!data.liquidity || data.liquidity <= 0) return false;
+  // must have liquidity
+  if (!apiData.liquidity || apiData.liquidity <= 0) return false;
 
   return true;
+};
+
+const formatMarketCap = (marketCap: number) => {
+
+  if (marketCap == null || isNaN(marketCap)) {
+    return "N/A";
+  }
+
+  if (marketCap >= 1_000_000) {
+    return `${(marketCap / 1_000_000).toFixed(2)}M`;
+  }
+
+  if (marketCap >= 1_000) {
+    return `${(marketCap / 1_000).toFixed(2)}K`;
+  }
+
+  return marketCap.toFixed(2);
 };
 
 const handleSubmit = async (e: React.FormEvent<HTMLFormElement>) => {
@@ -50,12 +81,13 @@ const handleSubmit = async (e: React.FormEvent<HTMLFormElement>) => {
   
   const address = inputValue.trim();
 
+  
   if (!address) {
     setError("Input a valid Token Mint Address");
     return;
   }
 
-  if (address.startsWith("0x")) {
+  if ((address.startsWith("0x")) && (address.length === 42) ) {
     setError("This is an EVM address. Paste a Solana mint address.");
     return;
   }
@@ -66,53 +98,33 @@ const handleSubmit = async (e: React.FormEvent<HTMLFormElement>) => {
   }
 
 
+    const response = await getTokenOverview(address);
 
-    try {
-      setLoading(true);
-      setError("");
-
-      const { data } = await getTokenOverview(inputValue);
-      console.log(data);
-      tokenAddress === inputValue
-      setTokenAddress(inputValue);
-      setName(data.name);
-      setPrice(Number(data.price).toFixed(7))
-      setMarketCap(data.marketCap)
-      setLogo(data.logoURI)
-      setSymbol(data.symbol)
-      setClear(true)
-      
-      getPriceChart
-
-      if (!validateToken(data)) {
+    if (!validateToken(response.data)) {
       setError("Invalid token mint address or unsupported token");
-      setLoading(false)
       return;
     }
-    } catch (err) {
-      setError("Failed to fetch price");
-    } finally {
-      setLoading(false);
-      
-    }
-  };
+
+    setError("");
+    setTokenAddress(address);
+    setChartPrice(response.data.price.toFixed(7));
+    setPolling(true);
+
+
+};
 
   const handleClear = (e: React.FormEvent<HTMLFormElement>)=> {
     e.preventDefault();
     setInputValue("")
     setTokenAddress("");
-    setName("");
-    setPrice("")
-    setMarketCap("")
-    setLogo("")
-    setSymbol("")
-    setClear(false)
+    setChartPrice("")
+    setPolling(false)
   }
 
   return (
     <div >
       <div className=" justify-center flex">
-      <form onSubmit={clear === true ? handleClear : handleSubmit} className="flex flex-col gap-5 items-center text-start w-120 bg-[hsl(0,0%,12%)] p-5 rounded-lg">
+      <form onSubmit={data ? handleClear : handleSubmit} className="flex flex-col gap-5 items-center text-start w-120 bg-[hsl(0,0%,12%)] p-5 rounded-lg">
         <input
           type="text"
           placeholder="paste token mint address"
@@ -123,24 +135,48 @@ const handleSubmit = async (e: React.FormEvent<HTMLFormElement>) => {
           onChange={(e) => setInputValue(e.target.value)}
         />
 
-      <div className={logo ? "block" : "hidden"}>
-        <img src={logo} alt={symbol} className="w-20 h-20 hover:"/>
-      </div>
+        <div className="font-semibold text-white flex flex-col gap-5">
+        <p className={error ? `text-red-500 block` : `hidden`}>{error}</p>
+        {isError && (
+          <p className="text-red-500">
+            Failed to fetch token details from API
+          </p>
+        )}
 
-        <div className="font-semibold text-white">
-          <p className="text-red-500">{error}</p>
-          <p className="text-red-500">{name && ( `Token Name: ${name}  "${symbol}"`) }</p>
-          <p className="text-amber-400">{marketCap && ( `Market Cap: $${marketCap}`)}</p>
-          <p className="text-green-500">{price && ( `Token Price: $${price}`)}</p>
-          
+      {data?.data.name && (
+        <div className="flex flex-col ">
+          <div className="self-center">
+          <img
+            src={data.data.logoURI}
+            alt={data.data.symbol}
+            className="w-20 h-20"
+          />
+          </div>
+
+          <p>
+            {data.data.name} ({data.data.symbol})
+          </p>
+
+          <p>
+            Price: $
+            {Number(data.data.price).toFixed(7)}
+          </p>
+
+          <p>
+            Market Cap: $
+            {formatMarketCap(data.data.marketCap)}
+          </p>
         </div>
+      )}
+        
+      </div>
         
 
         <button
-          disabled={loading}
-          className="w-50 h-[40px] bg-[hsl(0,0%,20%)] hover:bg-[hsl(75,94%,57%)] rounded-lg text-white font-bold block my-2"
+          disabled={isLoading}
+          className={isLoading ?  `w-50 h-[40px] bg-[hsl(0,0%,20%)] hover:bg-[hsl(0,0%,20%)] rounded-lg text-white font-bold block my-2`: `w-50 h-[40px] bg-[hsl(0,0%,20%)] hover:bg-[hsl(75,94%,57%)] rounded-lg text-white font-bold block my-2` }
         >
-          {loading ? "loading..." : clear ? "clear" : "submit"}
+          {isLoading ? "loading..." : data ? "clear" : "submit"}
         </button>
       </form>
     </div>
@@ -149,141 +185,3 @@ const handleSubmit = async (e: React.FormEvent<HTMLFormElement>) => {
 };
 
 export default Input;
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-// import React from 'react'
-// import { useState } from "react";
-// import axios from 'axios';
-
-// type TokenInput = {
-//     tokenAddress: string
-// }
-
-
-
-// const Prices = () => {
-  
-
-
-// const [tokenAddressInput, setTokenAddressInput] = useState<TokenInput>({ tokenAddress: "" })
-
-// const [error, setError] = useState<string>("");
-
-// const isValidSolanaAddress = (address: string): boolean => {
-//   if (!address) return false;
-
-//   // Solana addresses are base58, no 0x, usually 32–44 chars
-//   const base58Regex = /^[1-9A-HJ-NP-Za-km-z]{32,44}$/;
-
-//   if (!base58Regex.test(address)) return false;
-
-//   // extra safety: must NOT be Ethereum format
-//   if (address.startsWith("0x")) return false;
-
-//   return true;
-// };
-
-//   const handleChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-//     const { name, value } = e.target;
-//     const inputFieldName = name as keyof TokenInput;
-//     setTokenAddressInput({ ...tokenAddressInput, [inputFieldName]: value });
-//   };
-//      const getCurrentPrice = async () => {
-//       const priceApi = axios.create({
-//         baseURL:import.meta.env.VITE_BIRDEYE_API_URL,
-//           headers: {
-//             "x-chain": "solana",
-//             "accept": "application/json",
-//             "x-api-key": import.meta.env.VITE_BIRDEYE_API_KEY,
-            
-//           },
-//       })
-//       const res = await priceApi.get("/price", {
-//         params: {
-//           ui_amount_mode: "raw",
-//           address: tokenAddressInput.tokenAddress,
-//         }
-//       })
-//     console.log(tokenAddressInput.tokenAddress, res.data);
-    
-//     setTokenAddressInput({tokenAddress: ""})
-//     setError("")      
-//       return res.data;
-//     }
-
-// const submitTokenAddress = (e: React.FormEvent<HTMLFormElement>) => {
-//     e.preventDefault()
-
-//       const address = tokenAddressInput.tokenAddress.trim();
-//       if (!address) {
-//         setError("Input a valid Token Mint Address");
-//         return;
-//       }
-
-//       if (address.startsWith("0x")) {
-//         setError("This is an EVM address. Paste a Solana mint address.");
-//         return;
-//       }
-
-//       if (!isValidSolanaAddress(address)) {
-//         setError("Invalid Solana mint address format");
-//         return;
-//       } 
-//     getCurrentPrice()
-//   }
-
-
-//   return (
-//     <div>
-//         <form onSubmit={submitTokenAddress}>
-//             <input type="text"
-//             name='tokenAddress'
-//             placeholder='paste token mint address'
-//             className={`w-1/2 h-[45px] p-2 border-2 rounded-lg my-2 block ${error ? "border-red-500" : "border-gray-300" }`}
-//             value={tokenAddressInput.tokenAddress}
-//             onChange={handleChange}
-//              />
-//              <p className="text-red-500">{error}</p>
-//         <button className="w-1/2 h-[40px] bg-amber-400 rounded-lg text-white font-bold block my-2">
-//           submit
-//         </button>
-//         </form>
-//     </div>
-//   )
-// }
-
-
-
-// export default Prices
