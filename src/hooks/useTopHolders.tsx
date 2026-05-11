@@ -1,32 +1,57 @@
 import { useQuery } from "@tanstack/react-query";
-import { getTopHolders, getAccountOwner, detectBundling } from "../services/getTopHolders";
+import {
+  getTopHolders,
+  getMultipleAccountOwners,
+  getPoolAddressesForMint,
+  detectBundling,
+  getSolPrice
+} from "../services/getTopHolders";
+
 
 const fetchHoldersWithOwners = async (mintAddress: string) => {
-  // 1. get top token accounts
-  const rawHolders = await getTopHolders(mintAddress);
+  // run in parallel — top holders + all pool addresses for this mint
+  const [rawHolders, poolOwners] = await Promise.all([
+    getTopHolders(mintAddress),
+    getPoolAddressesForMint(mintAddress),
+  ]);
 
-  // 2. resolve each token account → real wallet address
-  const withOwners = await Promise.all(
-    rawHolders.map(async (h: any) => {
-      const walletAddress = await getAccountOwner(h.address);
+  const tokenAccounts = rawHolders.map((h: any) => h.address);
+  const accountInfos = await getMultipleAccountOwners(tokenAccounts);
+
+  return detectBundling(
+    rawHolders.map((h: any, i: number) => {
+      const { owner } = accountInfos[i];
+
+      // if the owner of this token account is in our pool owners set = LP
+      const isLP = poolOwners.has(owner);
+
+      console.log(h ,"token:", h.address, "| owner:", owner, "| isLP:", isLP);
+
       return {
         tokenAccount: h.address,
-        walletAddress,
+        walletAddress: owner,
         uiAmount: h.uiAmount,
+        isLP,
       };
     })
   );
-
-  // 3. flag suspected bundles
-  return detectBundling(withOwners);
 };
 
 export const useTopHolders = (mintAddress: string) => {
   return useQuery({
     queryKey: ["topHolders", mintAddress],
     queryFn: () => fetchHoldersWithOwners(mintAddress),
-    enabled: !!mintAddress,      // only runs when address is pasted
-    staleTime: 1000 * 60 * 2,   // cache for 2 minutes
+    enabled: !!mintAddress,
+    staleTime: 1000 * 60 * 2,
     retry: 2,
+  });
+};
+
+export const useSolPrice = () => {
+  return useQuery({
+    queryKey: ["solPrice"],
+    queryFn: getSolPrice,
+    staleTime: 1000 * 30, // 30s cache
+    refetchInterval: 1000 * 60,
   });
 };

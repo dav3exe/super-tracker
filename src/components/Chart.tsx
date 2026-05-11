@@ -14,6 +14,8 @@ export const Chart = () => {
   const [timeFrame, setTimeFrame] = useState("15m");
   const [range, setRange]= useState(86400);
 
+  const [show, setShow] = useState(false)
+
   useEffect(() => {
     if (!tokenAddress || !chartContainerRef.current || chartPrice) return;
 
@@ -41,6 +43,10 @@ export const Chart = () => {
       );
 
       const items = res?.data?.items || [];
+
+      if (items) {
+        setShow(true)
+      }
 
       const formatted = items.map((c: any) => ({
         time: c.unix_time,
@@ -70,12 +76,14 @@ console.log("token is", tokenAddress,
 
   return (
     <div >
-      {chartPrice && (
+      { show && (
       <div className="flex items-center gap-2 ">
       {/* DroPDown for timeframe */}
       <select value={timeFrame}
       onChange={(e)=> setTimeFrame(e.target.value)}
       className="p-2 rounded bg-[hsl(0,0%,20%)] text-white">
+
+      <div ref={chartContainerRef} className="bg-[hsl(0,0%,20%)]" />
         
         <option value="1s"> 1 Second</option>
         <option value="15s">15 Seconds</option>
@@ -115,7 +123,6 @@ console.log("token is", tokenAddress,
       </div>
       )}
 
-     <div ref={chartContainerRef} className="bg-[hsl(0,0%,20%)]" />
     </div>
   )
 };

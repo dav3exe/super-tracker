@@ -1,8 +1,9 @@
 import React, { useState } from "react";
-import { getTokenOverview } from "../services/getPrice";
+import { getTokenOverview } from "../services/getTokenOverview";
 import { getPriceChart } from "../services/getChart";
 import { useToken } from "../context/TokenContext";
 import { useQuery } from "@tanstack/react-query";
+import { formatNumber } from "../hooks/formatNumberDisplay";
 
 
 export const Input = () => {
@@ -59,23 +60,6 @@ const validateToken = (apiData: any): boolean => {
   return true;
 };
 
-const formatMarketCap = (marketCap: number) => {
-
-  if (marketCap == null || isNaN(marketCap)) {
-    return "N/A";
-  }
-
-  if (marketCap >= 1_000_000) {
-    return `${(marketCap / 1_000_000).toFixed(2)}M`;
-  }
-
-  if (marketCap >= 1_000) {
-    return `${(marketCap / 1_000).toFixed(2)}K`;
-  }
-
-  return marketCap.toFixed(2);
-};
-
 const handleSubmit = async (e: React.FormEvent<HTMLFormElement>) => {
   e.preventDefault();
   
@@ -119,12 +103,13 @@ const handleSubmit = async (e: React.FormEvent<HTMLFormElement>) => {
     setTokenAddress("");
     setChartPrice("")
     setPolling(false)
+    setError("")
   }
 
   return (
     <div >
-      <div className=" justify-center flex">
-      <form onSubmit={data ? handleClear : handleSubmit} className="flex flex-col gap-5 items-center text-start w-120 bg-[hsl(0,0%,12%)] p-5 rounded-lg">
+      <div className=" justify-center flex mt-20">
+      <form onSubmit={data ? handleClear : error ? handleClear : handleSubmit} className="flex flex-col gap-5 items-center text-start w-120 bg-[hsl(0,0%,12%)] p-5 rounded-lg">
         <input
           type="text"
           placeholder="paste token mint address"
@@ -144,7 +129,7 @@ const handleSubmit = async (e: React.FormEvent<HTMLFormElement>) => {
         )}
 
       {data?.data.name && (
-        <div className="flex flex-col ">
+        <div className="flex flex-col gap-1 ">
           <div className="self-center">
           <img
             src={data.data.logoURI}
@@ -153,7 +138,7 @@ const handleSubmit = async (e: React.FormEvent<HTMLFormElement>) => {
           />
           </div>
 
-          <p>
+          <p className="text-center">
             {data.data.name} ({data.data.symbol})
           </p>
 
@@ -164,7 +149,7 @@ const handleSubmit = async (e: React.FormEvent<HTMLFormElement>) => {
 
           <p>
             Market Cap: $
-            {formatMarketCap(data.data.marketCap)}
+            {formatNumber(data.data.marketCap)}
           </p>
         </div>
       )}
@@ -176,7 +161,7 @@ const handleSubmit = async (e: React.FormEvent<HTMLFormElement>) => {
           disabled={isLoading}
           className={isLoading ?  `w-50 h-[40px] bg-[hsl(0,0%,20%)] hover:bg-[hsl(0,0%,20%)] rounded-lg text-white font-bold block my-2`: `w-50 h-[40px] bg-[hsl(0,0%,20%)] hover:bg-[hsl(75,94%,57%)] rounded-lg text-white font-bold block my-2` }
         >
-          {isLoading ? "loading..." : data ? "clear" : "submit"}
+          {isLoading ? "loading..." : data ? "clear" : error ? "clear" : "submit"}
         </button>
       </form>
     </div>
