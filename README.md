@@ -1,73 +1,34 @@
-# React + TypeScript + Vite
+# Super Tracker
 
-This template provides a minimal setup to get React working in Vite with HMR and some ESLint rules.
+Solana memecoin analysis on one page. Paste a token mint address and get:
 
-Currently, two official plugins are available:
+- **Price chart**: candles from 1 minute to 1 week, plus price, market cap and liquidity (Birdeye).
+- **Organic market score**: 0–100 from fee activity, trader diversity, buy/sell balance and volume consistency.
+- **Top 10 holders**: liquidity pools, bundled wallets and possible insiders flagged; each holder's entry, sells, PnL and whole-wallet overview (Helius, Jupiter).
 
-- [@vitejs/plugin-react](https://github.com/vitejs/vite-plugin-react/blob/main/packages/plugin-react) uses [Oxc](https://oxc.rs)
-- [@vitejs/plugin-react-swc](https://github.com/vitejs/vite-plugin-react/blob/main/packages/plugin-react-swc) uses [SWC](https://swc.rs/)
+## Stack
 
-## React Compiler
+Next.js 16 (App Router), React 19, TypeScript (strict), Tailwind CSS 4, shadcn/ui, TanStack React Query, lightweight-charts.
 
-The React Compiler is not enabled on this template because of its impact on dev & build performances. To add it, see [this documentation](https://react.dev/learn/react-compiler/installation).
+## Setup
 
-## Expanding the ESLint configuration
-
-If you are developing a production application, we recommend updating the configuration to enable type-aware lint rules:
-
-```js
-export default defineConfig([
-  globalIgnores(['dist']),
-  {
-    files: ['**/*.{ts,tsx}'],
-    extends: [
-      // Other configs...
-
-      // Remove tseslint.configs.recommended and replace with this
-      tseslint.configs.recommendedTypeChecked,
-      // Alternatively, use this for stricter rules
-      tseslint.configs.strictTypeChecked,
-      // Optionally, add this for stylistic rules
-      tseslint.configs.stylisticTypeChecked,
-
-      // Other configs...
-    ],
-    languageOptions: {
-      parserOptions: {
-        project: ['./tsconfig.node.json', './tsconfig.app.json'],
-        tsconfigRootDir: import.meta.dirname,
-      },
-      // other options...
-    },
-  },
-])
+```bash
+npm install
+cp .env.example .env   # then fill in your keys
+npm run dev            # http://localhost:3000
 ```
 
-You can also install [eslint-plugin-react-x](https://github.com/Rel1cx/eslint-react/tree/main/packages/plugins/eslint-plugin-react-x) and [eslint-plugin-react-dom](https://github.com/Rel1cx/eslint-react/tree/main/packages/plugins/eslint-plugin-react-dom) for React-specific lint rules:
+| Variable | Used for |
+| --- | --- |
+| `NEXT_PUBLIC_BIRDEYE_API_URL` | Birdeye base URL, e.g. `https://public-api.birdeye.so` |
+| `NEXT_PUBLIC_BIRDEYE_API_KEY` | Token overview and OHLCV |
+| `NEXT_PUBLIC_HELIUS_API_KEY` | Holders, wallet history, portfolio |
 
-```js
-// eslint.config.js
-import reactX from 'eslint-plugin-react-x'
-import reactDom from 'eslint-plugin-react-dom'
+> These keys are currently read in the browser, so they are visible to anyone using the site. Moving the API calls into Route Handlers is the next planned step.
 
-export default defineConfig([
-  globalIgnores(['dist']),
-  {
-    files: ['**/*.{ts,tsx}'],
-    extends: [
-      // Other configs...
-      // Enable lint rules for React
-      reactX.configs['recommended-typescript'],
-      // Enable lint rules for React DOM
-      reactDom.configs.recommended,
-    ],
-    languageOptions: {
-      parserOptions: {
-        project: ['./tsconfig.node.json', './tsconfig.app.json'],
-        tsconfigRootDir: import.meta.dirname,
-      },
-      // other options...
-    },
-  },
-])
-```
+## Scripts
+
+- `npm run dev`: development server
+- `npm run build`: production build
+- `npm run lint`: ESLint
+- `npx tsc --noEmit`: type check
